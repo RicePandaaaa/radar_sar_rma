@@ -4,6 +4,8 @@ import numpy
 import scipy
 import scipy.signal
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+
 import wave
 try:
   import scipy.interpolate
@@ -35,7 +37,7 @@ def open_wave(fn):
   '''Returns a tuple of sync_samples, data_samples, and sample_rate.'''
   wavefile = wave.open(fn, 'r')
   raw_data = wavefile.readframes(wavefile.getnframes())
-  samples = numpy.fromstring(raw_data, dtype=numpy.int16)
+  samples = numpy.frombuffer(raw_data, dtype=numpy.int16)
   # try to use 128-bit float for the renormalization
   try:
     normed_samples = samples / numpy.float128(numpy.iinfo(numpy.int16).max)
@@ -133,7 +135,26 @@ def get_sar_frames(sync_samples, data_samples, sample_rate, pulse_period=20e-3):
     # There's potential for averaging multiple samples per frame instead of just
     # taking one, but that is not done here.
     frame = numpy.zeros(frame_size)
-    frame += data_samples[start:start+frame_size]
+    
+    #frame += data_samples[start:start+frame_size]
+    # Attempt to average the frames
+
+    frames = []
+
+    # Add the current frame
+    frames.append(data_samples[start:start+frame_size])
+
+    # Add the frame before if it exists
+    if start - frame_size >= 0:
+        frames.append(data_samples[start-frame_size:start])
+
+    # Add the frame after if it exists
+    if (start + (2 * frame_size)) < len(data_samples):
+        frames.append(data_samples[start+frame_size:start+2*frame_size])
+
+    # Compute the mean of frames along the first axis
+    frame = numpy.mean(numpy.stack(frames), axis=0)
+
     frame = scipy.signal.hilbert(frame)
     sar_frames.append(frame)
 
@@ -207,7 +228,7 @@ def RMA(sif, pulse_period=20e-3, freq_range=None, Rs=9.0):
   phi_mf = Rs * numpy.sqrt(Krr**2 - Kxx**2)
   # Remark: it seems that eq 10.8 is actually phi_mf(Kx, Kr) = -Rs*Kr + Rs*sqrt(Kr^2 - Kx^2)
   # Thus the MIT code appears wrong. To conform to the text, uncomment the following line:
-  #phi_mf -= Rs * Krr
+  # phi_mf -= Rs * Krr
   # However it is left commented by default because all it seems to do is shift everything downrange
   # closer to the radar by Rs with no noticeable improvement in picture quality. If you do
   # uncomment it, consider just subtracting Krr instead of Krr multiplied with Rs.
@@ -240,7 +261,7 @@ def RMA(sif, pulse_period=20e-3, freq_range=None, Rs=9.0):
   STEP 4: Inverse FFT, construct image
   '''
 
-  ifft_len = [len(S_st), len(S_st[0])] # if memory allows, multiply both
+  ifft_len = [len(S_st) * 4, len(S_st[0]) * 4] # if memory allows, multiply both
   # elements by 4 for perhaps a somewhat better image. Probably only viable on 64-bit Pythons.
   S_img = numpy.fliplr(numpy.rot90(numpy.fft.ifft2(S_st, ifft_len)))
 
@@ -287,8 +308,11 @@ def plot_img(sar_img_data):
     trunc_image[:,i] = (trunc_image[:,i]).transpose() * (abs(downrange*0.3048))**(3/2.0)
   trunc_image = 20 * numpy.log10(abs(trunc_image))
 
+  colors = [(0, 'darkblue'), (0.15, 'blue'), (0.3, 'cyan'), (0.45, 'lightgreen'), (0.6, 'yellow'), (0.75, 'orange'), (0.9, 'red'), (1, 'maroon')] # Define colors and their positions
+  cmap = LinearSegmentedColormap.from_list('custom_cmap', colors)
+
   plt.figure()
-  plt.pcolormesh(crossrange, downrange, trunc_image, edgecolors='None')
+  plt.pcolormesh(crossrange, downrange, trunc_image, cmap=cmap, edgecolors='None')
   plt.gca().invert_yaxis()
   plt.colorbar()
   plt.clim([numpy.max(trunc_image)-40, numpy.max(trunc_image)-0])
