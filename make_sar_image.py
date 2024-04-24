@@ -134,11 +134,10 @@ def get_sar_frames(sync_samples, data_samples, sample_rate, pulse_period=20e-3):
     # type and add the data to it before taking the transform.
     # There's potential for averaging multiple samples per frame instead of just
     # taking one, but that is not done here.
-    frame = numpy.zeros(frame_size)
+    #frame = numpy.zeros(frame_size)
     
     #frame += data_samples[start:start+frame_size]
     # Attempt to average the frames
-
     frames = []
 
     # Add the current frame
@@ -154,7 +153,6 @@ def get_sar_frames(sync_samples, data_samples, sample_rate, pulse_period=20e-3):
 
     # Compute the mean of frames along the first axis
     frame = numpy.mean(numpy.stack(frames), axis=0)
-
     frame = scipy.signal.hilbert(frame)
     sar_frames.append(frame)
 
@@ -261,7 +259,7 @@ def RMA(sif, pulse_period=20e-3, freq_range=None, Rs=9.0):
   STEP 4: Inverse FFT, construct image
   '''
 
-  ifft_len = [len(S_st) * 4, len(S_st[0]) * 4] # if memory allows, multiply both
+  ifft_len = [len(S_st) * 8, len(S_st[0]) * 8] # if memory allows, multiply both
   # elements by 4 for perhaps a somewhat better image. Probably only viable on 64-bit Pythons.
   S_img = numpy.fliplr(numpy.rot90(numpy.fft.ifft2(S_st, ifft_len)))
 
@@ -356,7 +354,7 @@ def make_sar_image(setup_data):
 def main():
   parser = argparse.ArgumentParser(description="Generate a SAR image outputted by default to 'sar_image.png' from a WAV file of appropriate data.")
   parser.add_argument('-f', nargs='?', type=str, default='mit-towardswarehouse.wav', help="Filename containing SAR data in appropriate format (default: mit-towardswarehouse.wav (prefix filename with 'mit-' to use MIT's frequency range if your VCO range is different))")
-  parser.add_argument('-o', nargs='?', type=str, default='sar_image.png', help="Filename to save the SAR image to (default: sar_image.png)")
+  parser.add_argument('-o', nargs='?', type=str, default='8x_multiplier_with_moving_window.png', help="Filename to save the SAR image to (default: sar_image.png)")
   parser.add_argument('-rs', nargs='?', type=float, default=30.0, help='Downrange distance (ft) to calibration target at scene center (default: 30)')
   parser.add_argument('-cr1', nargs='?', type=float, default=-80.0, help='Farthest crossrange distance (ft) left of scene center shown in image viewport (default: -80, minimum: -170)')
   parser.add_argument('-cr2', nargs='?', type=float, default=80.0, help='Farthest crossrange distance (ft) right of the scene center shown in image viewport (default: 80, maximum: 170)')
